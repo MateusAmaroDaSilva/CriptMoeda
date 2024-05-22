@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cryptocurrency Info</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Estilo inspirado na Binance */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .crypto-options {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .crypto-option {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .crypto-option:hover {
+            transform: scale(1.1);
+        }
+
+        .crypto-option img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+        }
+
+        .crypto-option-name {
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 10px;
+        }
+
+        .crypto-info {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            display: none;
+        }
+
+        .chart-container {
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            margin-bottom: 10px;
+        }
+
+        .info-item strong {
+            margin-right: 5px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cryptocurrency Info</h1>
+        <div class="crypto-options">
+            <div class="crypto-option" onclick="getCryptoInfo('binancecoin')">
+                <img src="https://assets.coingecko.com/coins/images/825/small/binance-coin-logo.png?1547034615" alt="Binance Coin">
+                <div class="crypto-option-name">Binance Coin (BNB)</div>
+            </div>
+            <div class="crypto-option" onclick="getCryptoInfo('bitcoin')">
+                <img src="https://assets.coingecko.com/coins/images/1/small/bitcoin.png?1547033579" alt="Bitcoin">
+                <div class="crypto-option-name">Bitcoin (BTC)</div>
+            </div>
+            <div class="crypto-option" onclick="getCryptoInfo('ethereum')">
+                <img src="https://assets.coingecko.com/coins/images/279/small/ethereum.png?1595348880" alt="Ethereum">
+                <div class="crypto-option-name">Ethereum (ETH)</div>
+            </div>
+        </div>
+        <div class="crypto-info" id="crypto-info"></div>
+        <div class="chart-container">
+            <canvas id="crypto-chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let cryptoChart;
+
+        // Função para obter informações da criptomoeda selecionada
+        function getCryptoInfo(crypto) {
+            fetch(`https://api.coingecko.com/api/v3/coins/${crypto}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`)
+                .then(response => response.json())
+                .then(data => {
+                    const name = data.name;
+                    const symbol = data.symbol.toUpperCase();
+                    const currentPrice = data.market_data.current_price.usd;
+                    const marketCap = data.market_data.market_cap.usd;
+                    const totalVolume = data.market_data.total_volume.usd;
+                    const high24h = data.market_data.high_24h.usd;
+                    const low24h = data.market_data.low_24h.usd;
+
+                    const cryptoInfo = document.getElementById("crypto-info");
+                    cryptoInfo.innerHTML = `
+                        <h2>${name} (${symbol})</h2>
+                        <div class="info-item"><strong>Current Price:</strong> $${currentPrice.toLocaleString()}</div>
+                        <div class="info-item"><strong>Market Cap:</strong> $${marketCap.toLocaleString()}</div>
+                        <div class="info-item"><strong>Total Volume:</strong> $${totalVolume.toLocaleString()}</div>
+                        <div class="info-item"><strong>24h High:</strong> $${high24h.toLocaleString()}</div>
+                        <div class="info-item"><strong>24h Low:</strong> $${low24h.toLocaleString()}</div>
+                    `;
+
+                    // Obtenha os preços dos últimos 7 dias para o gráfico
+                    getMarketChart(crypto, name);
+                })
+                .catch(error => console.error('Error:', error));
+
+            // Mostra as informações
+            const cryptoInfo = document.getElementById("crypto-info");
+            cryptoInfo.style.display = "block";
+        }
+
+        // Função para obter o gráfico de mercado
+        function getMarketChart(crypto, name) {
+            fetch(`https://api.coingecko.com/api/v3/coins/${crypto}/market_chart?vs_currency=usd&days=7&interval=daily`)
+                .then(response => response.json())
+                .then(data => {
+                    const prices = data.prices.map(entry => entry[1]);
+                    updateChart(prices, name);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Função para atualizar o gráfico
+        function updateChart(prices, name) {
+            const ctx = document.getElementById('crypto-chart').getContext('2d');
+
+            const labels = Array.from({ length: prices.length }, (_, i) => `Day ${i + 1}`);
+
+            if (cryptoChart) {
+                cryptoChart.destroy();
+            }
+
+            cryptoChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${name} Price (USD)`,
+                        data: prices,
+                        backgroundColor: 'rgba(240, 185, 11, 0.2)',
+                        borderColor: 'rgba(240, 185, 11, 1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: 'rgba(240, 185, 11, 1)',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
